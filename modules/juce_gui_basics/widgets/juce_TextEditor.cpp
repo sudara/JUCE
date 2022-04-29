@@ -1632,7 +1632,7 @@ int TextEditor::getTextIndexAt (const int x, const int y) const
     const auto offset = getTextOffset();
 
     return indexAtPosition ((float) (x - offset.x),
-                            (float) (y - offset.y));
+                            (float) (y));
 }
 
 void TextEditor::insertTextAtCaret (const String& t)
