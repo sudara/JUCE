@@ -41,6 +41,7 @@ DrawablePath::~DrawablePath() {}
 DrawablePath::DrawablePath (const DrawablePath& other)  : DrawableShape (other)
 {
     setPath (other.path);
+    setAlpha (other.getAlpha());
 }
 
 std::unique_ptr<Drawable> DrawablePath::createCopy() const
