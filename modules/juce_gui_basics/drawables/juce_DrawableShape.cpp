@@ -114,6 +114,7 @@ void DrawableShape::paint (Graphics& g)
     if (isStrokeVisible())
     {
         g.setFillType (strokeFill);
+        g.setOpacity (getAlpha());
         g.fillPath (strokePath);
     }
 }

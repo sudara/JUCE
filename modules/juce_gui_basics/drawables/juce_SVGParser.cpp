@@ -482,6 +482,10 @@ private:
                 if (! isNone (getStyleAttribute (child, "display")))
                     drawable->setVisible (true);
 
+                const auto opacity = getStyleAttribute (child, "opacity");
+                if (opacity.isNotEmpty())
+                    drawable->setAlpha (jlimit (0.0f, 1.0f, parseSafeFloat (opacity)));
+
                 if (shouldParseClip)
                     parseClipPath (child, *drawable);
             }
@@ -716,7 +720,6 @@ private:
 
         dp->setFill (getPathFillType (path, xml, "fill",
                                       getStyleAttribute (xml, "fill-opacity"),
-                                      getStyleAttribute (xml, "opacity"),
                                       pathContainsClosedSubPath (path) ? Colours::black
                                                                        : Colours::transparentBlack));
 
@@ -726,7 +729,6 @@ private:
         {
             dp->setStrokeFill (getPathFillType (path, xml, "stroke",
                                                 getStyleAttribute (xml, "stroke-opacity"),
-                                                getStyleAttribute (xml, "opacity"),
                                                 Colours::transparentBlack));
 
             dp->setStrokeType (getStrokeFor (xml));
@@ -986,16 +988,12 @@ private:
                               const XmlPath& xml,
                               StringRef fillAttribute,
                               const String& fillOpacity,
-                              const String& overallOpacity,
                               const Colour defaultColour) const
     {
         float opacity = 1.0f;
 
-        if (overallOpacity.isNotEmpty())
-            opacity = jlimit (0.0f, 1.0f, parseSafeFloat (overallOpacity));
-
         if (fillOpacity.isNotEmpty())
-            opacity *= jlimit (0.0f, 1.0f, parseSafeFloat (fillOpacity));
+            opacity = jlimit (0.0f, 1.0f, parseSafeFloat (fillOpacity));
 
         String fill (getStyleAttribute (xml, fillAttribute));
         String urlID = parseURL (fill);
