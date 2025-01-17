@@ -120,7 +120,7 @@ add_library(juce::juce_recommended_config_flags ALIAS juce_recommended_config_fl
 if((CMAKE_CXX_COMPILER_ID STREQUAL "MSVC") OR (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
     _juce_get_debug_config_genex(debug_config)
     target_compile_options(juce_recommended_config_flags INTERFACE
-        $<IF:${debug_config},/Od /Zi,/Ox> $<$<STREQUAL:"${CMAKE_CXX_COMPILER_ID}","MSVC">:/MP> /EHsc)
+        $<IF:${debug_config},/Od,/Ox> $<$<STREQUAL:"${CMAKE_CXX_COMPILER_ID}","MSVC">:/MP> /EHsc)
 elseif((CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
        OR (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
        OR (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
