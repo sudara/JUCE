@@ -643,7 +643,7 @@ private:
     void addParameterAdapter (RangedAudioParameter&);
     ParameterAdapter* getParameterAdapter (StringRef) const;
 
-    bool flushParameterValuesToValueTree();
+    bool flushParameterValuesToValueTree(bool bypassUndoManager = false);
     void setNewState (ValueTree);
     void timerCallback() override;
 

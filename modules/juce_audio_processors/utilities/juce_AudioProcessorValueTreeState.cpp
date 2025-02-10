@@ -457,21 +457,21 @@ void AudioProcessorValueTreeState::valueTreeRedirected (ValueTree& v)
         updateParameterConnectionsToChildTrees();
 }
 
-bool AudioProcessorValueTreeState::flushParameterValuesToValueTree()
+bool AudioProcessorValueTreeState::flushParameterValuesToValueTree(bool bypassUndoManager)
 {
     ScopedLock lock (valueTreeChanging);
 
     bool anyUpdated = false;
 
     for (auto& p : adapterTable)
-        anyUpdated |= p.second->flushToTree (valuePropertyID, undoManager);
+        anyUpdated |= p.second->flushToTree (valuePropertyID, bypassUndoManager ? nullptr : undoManager);
 
     return anyUpdated;
 }
 
 void AudioProcessorValueTreeState::timerCallback()
 {
-    auto anythingUpdated = flushParameterValuesToValueTree();
+    auto anythingUpdated = flushParameterValuesToValueTree(false);
 
     startTimer (anythingUpdated ? 1000 / 50
                                 : jlimit (50, 500, getTimerInterval() + 20));
