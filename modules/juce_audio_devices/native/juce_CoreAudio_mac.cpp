@@ -324,6 +324,7 @@ private:
 };
 
 using CFStringProperty = CFProperty<CFStringRef>;
+using CFDictionaryProperty = CFProperty<CFDictionaryRef>;
 
 //==============================================================================
 template <typename T>
@@ -407,6 +408,12 @@ template<>
 String propertyValueToString (const CFDictionaryRef& dict)
 {
     return String::fromCFString (makeCFUniquePtr (CFCopyDescription (dict)).get());
+}
+
+template<>
+String propertyValueToString (const CFDictionaryProperty& dict)
+{
+    return dict.get() != nullptr ? propertyValueToString (dict.get()) : String{};
 }
 
 template<>
@@ -1012,6 +1019,37 @@ public:
         return getPropertyArray<AudioDevice> (kAudioAggregateDevicePropertyActiveSubDeviceList);
     }
 
+    // A stacked aggregate (a "Multi-Output Device" in Audio MIDI Setup) mirrors
+    // every channel to all of its sub-devices, rather than concatenating them.
+    // Note the AudioHardware.h discussion of kAudioAggregateDeviceIsStackedKey
+    // says 0 means mirrored, but in practice a Multi-Output Device reports 1
+    // (as a CFBoolean rather than the documented CFNumber), and non-mirrored
+    // aggregates omit the key entirely.
+    bool isStacked() const
+    {
+        const auto composition = getPropertyOrDefault<CFDictionaryProperty> (kAudioAggregateDevicePropertyComposition);
+
+        if (composition.get() == nullptr)
+            return false;
+
+        const auto* value = CFDictionaryGetValue (composition.get(), CFSTR (kAudioAggregateDeviceIsStackedKey));
+
+        if (value == nullptr)
+            return false;
+
+        if (CFGetTypeID (value) == CFBooleanGetTypeID())
+            return CFBooleanGetValue (static_cast<CFBooleanRef> (value));
+
+        if (CFGetTypeID (value) == CFNumberGetTypeID())
+        {
+            int stacked{};
+            CFNumberGetValue (static_cast<CFNumberRef> (value), kCFNumberIntType, &stacked);
+            return stacked != 0;
+        }
+
+        return false;
+    }
+
     bool configure (const ScopedCFDictionary& newComposition)
     {
         return setProperty (kAudioAggregateDevicePropertyComposition, newComposition.get());
@@ -1158,6 +1196,16 @@ private:
         if (! device.isValid())
             return;
 
+        // A stacked aggregate (multi-output device) mirrors its presented
+        // channels to every sub-device. Flattening it loses that behaviour,
+        // so recreate it in the map: the leading channels of each sub-device
+        // all read from the same virtual channels.
+        const auto mirrored = direction == PlaybackDirection::output
+                           && device.isAggregateDevice()
+                           && AggregateAudioDevice { device.getId() }.isStacked();
+
+        const auto numPresentedChannels = device.getNumChannels (direction);
+
         int deviceChannelIndex = 0;
 
         for (auto audioDevice : getAudioDevices (device))
@@ -1166,11 +1214,15 @@ private:
 
             const auto numChannels = audioDevice.getNumChannels (direction);
             const auto aggregateChannelIndex = getFirstChannelIndexFor (audioDevice, direction);
+            const auto numMappedChannels = mirrored ? jmin (numChannels, numPresentedChannels)
+                                                    : numChannels;
 
-            for (auto channel = 0; channel < numChannels; ++channel)
-                channelMap[toUnderlyingType (direction)].set (aggregateChannelIndex + channel, deviceChannelIndex + channel);
+            for (auto channel = 0; channel < numMappedChannels; ++channel)
+                channelMap[toUnderlyingType (direction)].set (aggregateChannelIndex + channel,
+                                                              mirrored ? channel : deviceChannelIndex + channel);
 
-            deviceChannelIndex += numChannels;
+            if (! mirrored)
+                deviceChannelIndex += numChannels;
         }
     }
 
@@ -2076,11 +2128,19 @@ private:
 
             if (device.isAggregateDevice())
             {
-                const auto devs = AggregateAudioDevice { device.getId() }.getSubDevices();
-                subDevices.reserve (devs.size());
+                const AggregateAudioDevice aggregate { device.getId() };
 
-                for (auto dev : devs)
-                    subDevices.push_back ({ dev.getName(), dev.getNumChannels (direction) });
+                // Every output channel of a stacked aggregate feeds all
+                // sub-devices, so per-channel attribution would mislabel
+                // everything after the first one. Leave the names neutral.
+                if (! aggregate.isStacked())
+                {
+                    const auto devs = aggregate.getSubDevices();
+                    subDevices.reserve (devs.size());
+
+                    for (auto dev : devs)
+                        subDevices.push_back ({ dev.getName(), dev.getNumChannels (direction) });
+                }
             }
 
             for (int index = 0; index < numChannels; ++index)
