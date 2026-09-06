@@ -1793,7 +1793,7 @@ void Component::setMouseCursor (const MouseCursor& newCursor)
     {
         cursor = newCursor;
 
-        if (flags.visibleFlag)
+        if (isShowing())
             updateMouseCursor();
     }
 }
