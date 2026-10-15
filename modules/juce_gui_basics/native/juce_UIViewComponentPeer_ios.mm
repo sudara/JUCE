@@ -708,6 +708,12 @@ MultiTouchMapper<UITouch*> UIViewComponentPeer::currentTouches;
      return isKioskModeView (self);
  }
 
+// In kiosk mode the app gets touches at the screen edges straight away; the system edge swipes then need a second swipe
+- (UIRectEdge) preferredScreenEdgesDeferringSystemGestures
+{
+    return isKioskModeView (self) ? UIRectEdgeAll : UIRectEdgeNone;
+}
+
 - (UIStatusBarStyle) preferredStatusBarStyle
 {
     if (@available (iOS 13.0, *))
@@ -2383,7 +2389,11 @@ void Desktop::setKioskComponent (Component* kioskModeComp, bool enableOrDisable,
     if (auto* peer = kioskModeComp->getPeer())
     {
         if (auto* uiViewPeer = dynamic_cast<UIViewComponentPeer*> (peer))
+        {
             [uiViewPeer->controller setNeedsStatusBarAppearanceUpdate];
+            [uiViewPeer->controller setNeedsUpdateOfHomeIndicatorAutoHidden];
+            [uiViewPeer->controller setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
+        }
 
         peer->setFullScreen (enableOrDisable);
     }
