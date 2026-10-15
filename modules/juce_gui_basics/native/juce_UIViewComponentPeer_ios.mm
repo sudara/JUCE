@@ -703,9 +703,10 @@ MultiTouchMapper<UITouch*> UIViewComponentPeer::currentTouches;
     return [super prefersStatusBarHidden];
 }
 
+// Auto-hiding the indicator cancels the edge-gesture deferral below (SDL treats them as exclusive modes), and the deferral already dims it
  - (BOOL) prefersHomeIndicatorAutoHidden
  {
-     return isKioskModeView (self);
+     return NO;
  }
 
 // Touches at the screen edges reach the app straight away; the system edge swipes then need a second swipe
