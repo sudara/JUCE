@@ -708,10 +708,10 @@ MultiTouchMapper<UITouch*> UIViewComponentPeer::currentTouches;
      return isKioskModeView (self);
  }
 
-// In kiosk mode the app gets touches at the screen edges straight away; the system edge swipes then need a second swipe
+// Touches at the screen edges reach the app straight away; the system edge swipes then need a second swipe
 - (UIRectEdge) preferredScreenEdgesDeferringSystemGestures
 {
-    return isKioskModeView (self) ? UIRectEdgeAll : UIRectEdgeNone;
+    return UIRectEdgeAll;
 }
 
 - (UIStatusBarStyle) preferredStatusBarStyle
