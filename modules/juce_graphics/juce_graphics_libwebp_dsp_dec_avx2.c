@@ -60,6 +60,10 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wsign-conversion",
 
 #if JUCE_INTEL
  #if JUCE_CLANG
+  #if defined (_MSC_VER)
+   // libwebp includes <intrin.h>, which clang-cl 19 and 20 can't compile with the target attribute below applied, so include it first
+   #include <intrin.h>
+  #endif
   #pragma clang attribute push (__attribute__ ((target ("avx2"))), apply_to=function)
  #elif JUCE_GCC
   #pragma GCC push_options
