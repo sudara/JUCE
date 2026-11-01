@@ -411,6 +411,12 @@ public:
         synchronous boundary: after this returns, no deferred timer flush remains
         to write parameter values back into the tree with the undo manager.
 
+        Like the internal timer flush and copyState(), this only records changes made
+        between beginChangeGesture() and endChangeGesture(), so host automation never
+        lands on the undo manager. The undo step holds the value set inside the gesture,
+        even if automation changed the parameter again before the flush. A gesture whose
+        parameter is back at its stored value by the time of the flush records nothing.
+
         Returns true if any parameter values were flushed.
 
         Note: This method uses locks to synchronise thread access, so whilst it is
@@ -418,6 +424,17 @@ public:
         your audio processing code!
     */
     bool flushParameterValuesToValueTree (UndoManager* undoManagerToUse);
+
+    /** Called with the parameter's ID each time a flush records a change made inside
+        a gesture on an UndoManager. Automation and other changes made outside a
+        gesture never trigger it.
+
+        It runs on the thread that flushes. That is the message thread, unless you call
+        copyState() or flushParameterValuesToValueTree() from another thread. It runs
+        straight after the write, so an undoable change it makes joins the same
+        undo transaction.
+    */
+    std::function<void (const String& parameterID)> onGestureEditRecorded;
 
     //==============================================================================
     /** A reference to the processor with which this state is associated. */

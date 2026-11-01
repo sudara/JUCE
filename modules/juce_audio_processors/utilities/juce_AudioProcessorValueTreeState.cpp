@@ -100,6 +100,10 @@ public:
 
     void setDenormalisedValue (float value)
     {
+        // an undo or state replace moved the tree, so a gesture value still waiting for a flush is stale
+        if (! ignoreParameterChangedCallbacks)
+            changedDuringGesture = false;
+
         if (! approximatelyEqual (value, (float) unnormalisedValue))
             setNormalisedValue (normalise (value));
     }
@@ -117,19 +121,35 @@ public:
     float getDenormalisedValue() const                { return unnormalisedValue; }
     std::atomic<float>& getRawDenormalisedValue()     { return unnormalisedValue; }
 
-    bool flushToTree (const Identifier& key, UndoManager* um)
+    bool flushToTree (const Identifier& key, UndoManager* um, bool& recordedGestureEdit)
     {
+        recordedGestureEdit = false;
         auto needsUpdateTestValue = true;
 
         if (! needsUpdate.compare_exchange_strong (needsUpdateTestValue, false))
             return false;
 
-        if (auto* valueProperty = tree.getPropertyPointer (key))
+        // hosts never start gestures, so this keeps automation off the undo manager
+        const auto isUserEdit = changedDuringGesture.exchange (false) && um != nullptr && ! um->isPerformingUndoRedo();
+
+        if (tree.hasProperty (key))
         {
-            if (! approximatelyEqual ((float) *valueProperty, unnormalisedValue.load()))
+            const auto valueInTree = [&] { return (float) tree.getProperty (key); };
+            const auto value = unnormalisedValue.load();
+
+            if (! approximatelyEqual (valueInTree(), value))
             {
                 ScopedValueSetter<bool> svs (ignoreParameterChangedCallbacks, true);
-                tree.setProperty (key, unnormalisedValue.load(), um);
+
+                // automation can move the parameter after the gesture ends, so the undo step takes the gesture's own value
+                if (isUserEdit && ! approximatelyEqual (valueInTree(), gestureValue.load()))
+                {
+                    tree.setProperty (key, gestureValue.load(), um);
+                    recordedGestureEdit = true;
+                }
+
+                if (! approximatelyEqual (valueInTree(), value))
+                    tree.setProperty (key, value, nullptr);
             }
         }
         else
@@ -143,7 +163,10 @@ public:
     ValueTree tree;
 
 private:
-    void parameterGestureChanged (int, bool) override {}
+    void parameterGestureChanged (int, bool gestureIsStarting) override
+    {
+        gestureInProgress = gestureIsStarting;
+    }
 
     void parameterValueChanged (int, float) override
     {
@@ -155,6 +178,13 @@ private:
         unnormalisedValue = newValue;
         listeners.call ([this] (Listener& l) { l.parameterChanged (parameter.paramID, unnormalisedValue); });
         listenersNeedCalling = false;
+
+        if (gestureInProgress)
+        {
+            gestureValue = newValue;
+            changedDuringGesture = true;
+        }
+
         needsUpdate = true;
     }
 
@@ -205,8 +235,8 @@ private:
 
     RangedAudioParameter& parameter;
     LockedListeners listeners;
-    std::atomic<float> unnormalisedValue { 0.0f };
-    std::atomic<bool> needsUpdate { true }, listenersNeedCalling { true };
+    std::atomic<float> unnormalisedValue { 0.0f }, gestureValue { 0.0f };
+    std::atomic<bool> needsUpdate { true }, listenersNeedCalling { true }, gestureInProgress { false }, changedDuringGesture { false };
     bool ignoreParameterChangedCallbacks { false };
 };
 
@@ -470,7 +500,13 @@ bool AudioProcessorValueTreeState::flushParameterValuesToValueTree (UndoManager*
     bool anyUpdated = false;
 
     for (auto& p : adapterTable)
-        anyUpdated |= p.second->flushToTree (valuePropertyID, undoManagerToUse);
+    {
+        auto recordedGestureEdit = false;
+        anyUpdated |= p.second->flushToTree (valuePropertyID, undoManagerToUse, recordedGestureEdit);
+
+        if (recordedGestureEdit)
+            NullCheckedInvocation::invoke (onGestureEditRecorded, p.second->getParameter().paramID);
+    }
 
     return anyUpdated;
 }
