@@ -1466,6 +1466,7 @@ public:
         setup = newSetup;
         activeChannelMap = {};
         detectedSetupChange = false;
+        workgroup = coreAudioDevice.getAudioWorkgroup();
 
         for (const auto direction : getAllPlaybackDirections())
         {
@@ -1521,6 +1522,8 @@ public:
     }
 
     int getNumOverloads() const { return processor.getNumOverloads(); }
+
+    AudioWorkgroup getWorkgroup() const { return workgroup; }
 
 private:
     void stopInternal()
@@ -1636,6 +1639,7 @@ private:
     AudioDevice coreAudioDevice;
     DeviceSetup setup;
     std::array<ChannelMap, 2> activeChannelMap;
+    AudioWorkgroup workgroup;
     DeviceSetupChangedListener* listener;
     AudioIODeviceCallback* callback{};
     AudioDeviceProcessor processor { coreAudioDevice, this };
@@ -2147,7 +2151,7 @@ private:
 
         AudioWorkgroup getWorkgroup() const final
         {
-            return aggregateDevice.getAudioWorkgroup();
+            return playbackHandler.getWorkgroup();
         }
 
         //==============================================================================
