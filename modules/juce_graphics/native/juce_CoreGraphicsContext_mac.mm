@@ -843,6 +843,15 @@ BlendMode CoreGraphicsContext::activateBlendMode (juce::BlendMode mode)
     return previous;
 }
 
+static void snapUnscaledImageToDevicePixels (CGContextRef context)
+{
+    const auto t = CGContextGetUserSpaceToDeviceSpaceTransform (context);
+    const auto isOne = [] (CGFloat v) { return std::abs (std::abs (v) - 1.0) < 1.0e-4; };
+
+    if (isOne (t.a) && isOne (t.d) && std::abs (t.b) < 1.0e-4 && std::abs (t.c) < 1.0e-4)
+        CGContextTranslateCTM (context, (std::round (t.tx) - t.tx) / t.a, (std::round (t.ty) - t.ty) / t.d);
+}
+
 void CoreGraphicsContext::drawImage (const Image& sourceImage, const AffineTransform& transform)
 {
     drawImage (sourceImage, transform, false);
@@ -865,6 +874,7 @@ void CoreGraphicsContext::drawImage (const Image& sourceImage, const AffineTrans
 
     flip();
     applyTransform (AffineTransform::verticalFlip ((float) ih).followedBy (transform));
+    snapUnscaledImageToDevicePixels (context.get());
     auto imageRect = CGRectMake (0, 0, iw, ih);
 
     if (fillEntireClipAsTiles)
